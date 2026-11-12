@@ -1,88 +1,54 @@
 from http import HTTPStatus
-from urllib.parse import parse_qs, urlparse
-
-import pytest
-from django.urls import reverse
 
 
-@pytest.mark.parametrize(
-    'url_name',
-    [
-        'news:home',
-        'news:detail',
-        'users:login',
-        'users:signup',
-    ],
-)
-def test_pages_available_to_anonymous_user(
-    client, url_name, news
+def test_status_codes(
+    client,
+    author_client,
+    reader_client,
+    home_url,
+    detail_url,
+    login_url,
+    signup_url,
+    edit_url,
+    delete_url,
+    subtests,
 ):
-    url = reverse(
-        url_name,
-        kwargs={'pk': news.pk} if url_name == 'news:detail' else None,
-    )
+    test_cases = [
+        (home_url, client, HTTPStatus.OK),
+        (detail_url, client, HTTPStatus.OK),
+        (login_url, client, HTTPStatus.OK),
+        (signup_url, client, HTTPStatus.OK),
+        (edit_url, author_client, HTTPStatus.OK),
+        (delete_url, author_client, HTTPStatus.OK),
+        (edit_url, reader_client, HTTPStatus.NOT_FOUND),
+        (delete_url, reader_client, HTTPStatus.NOT_FOUND),
+    ]
 
-    response = client.get(url)
+    for url, user_client, expected_status in test_cases:
+        with subtests.test(url=url, expected_status=expected_status):
+            assert user_client.get(url).status_code == expected_status
 
-    assert response.status_code == HTTPStatus.OK
 
-
-@pytest.mark.parametrize(
-    'url_name',
-    [
-        'news:edit',
-        'news:delete',
-    ],
-)
-def test_author_can_access_comment_pages(
-    author_client, url_name, comment
+def test_redirects(
+    client,
+    author_client,
+    edit_url,
+    delete_url,
+    login_url,
+    logout_url,
+    subtests,
 ):
-    url = reverse(url_name, args=(comment.pk,))
+    redirect_cases = [
+        (edit_url, f'{login_url}?next={edit_url}'),
+        (delete_url, f'{login_url}?next={delete_url}'),
+    ]
 
-    response = author_client.get(url)
+    for url, expected_url in redirect_cases:
+        with subtests.test(url=url):
+            response = client.get(url)
 
-    assert response.status_code == HTTPStatus.OK
+            assert response.url == expected_url
 
-
-@pytest.mark.parametrize(
-    'url_name',
-    [
-        'news:edit',
-        'news:delete',
-    ],
-)
-def test_other_user_cannot_access_comment_pages(
-    reader_client, url_name, comment
-):
-    url = reverse(url_name, args=(comment.pk,))
-
-    response = reader_client.get(url)
-
-    assert response.status_code == HTTPStatus.NOT_FOUND
-
-
-@pytest.mark.parametrize(
-    'url_name',
-    [
-        'news:edit',
-        'news:delete',
-    ],
-)
-def test_anonymous_user_redirected_to_login(
-    client, url_name, comment, login_url
-):
-    url = reverse(url_name, args=(comment.pk,))
-
-    response = client.get(url)
-
-    parsed_url = urlparse(response.url)
-
-    assert response.status_code == HTTPStatus.FOUND
-    assert parsed_url.path == login_url
-    assert parse_qs(parsed_url.query) == {'next': [url]}
-
-
-def test_logout_by_post(author_client, logout_url):
     author_client.post(logout_url)
 
     assert '_auth_user_id' not in author_client.session

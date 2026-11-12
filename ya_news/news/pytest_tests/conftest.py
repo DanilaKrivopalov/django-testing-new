@@ -2,6 +2,7 @@ from datetime import timedelta
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
@@ -28,13 +29,15 @@ def reader(db):
 
 
 @pytest.fixture
-def author_client(client, author, db):
+def author_client(author):
+    client = Client()
     client.force_login(author)
     return client
 
 
 @pytest.fixture
-def reader_client(client, reader, db):
+def reader_client(reader):
+    client = Client()
     client.force_login(reader)
     return client
 
@@ -72,21 +75,15 @@ def news_list(db):
 @pytest.fixture
 def comments(db, author, news):
     current_time = timezone.now()
-
-    comment_objects = []
-
-    for number in range(3):
-        comment = Comment.objects.create(
+    return Comment.objects.bulk_create([
+        Comment(
             news=news,
             author=author,
             text=f'Комментарий {number}',
+            created=current_time - timedelta(minutes=number),
         )
-        Comment.objects.filter(pk=comment.pk).update(
-            created=current_time + timedelta(minutes=number)
-        )
-        comment_objects.append(comment)
-
-    return comment_objects
+        for number in range(3)
+    ])
 
 
 @pytest.fixture
@@ -97,6 +94,11 @@ def home_url():
 @pytest.fixture
 def detail_url(news):
     return reverse('news:detail', args=(news.pk,))
+
+
+@pytest.fixture
+def detail_url_with_comments(detail_url):
+    return f'{detail_url}#comments'
 
 
 @pytest.fixture

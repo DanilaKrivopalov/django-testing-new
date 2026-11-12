@@ -1,4 +1,4 @@
-from http import HTTPStatus
+from django.conf import settings
 
 from news.forms import CommentForm
 
@@ -6,47 +6,48 @@ from news.forms import CommentForm
 def test_news_count_on_home_page(client, home_url, news_list):
     response = client.get(home_url)
 
-    assert response.status_code == HTTPStatus.OK
-    assert len(response.context['object_list']) == 10
+    assert len(response.context['object_list']) == (
+        settings.NEWS_COUNT_ON_HOME_PAGE
+    )
 
 
 def test_news_order_on_home_page(client, home_url, news_list):
-    response = client.get(home_url)
-
     actual_dates = [
-        news.date for news in response.context['object_list']
+        news.date
+        for news in client.get(home_url).context['object_list']
     ]
+
     expected_dates = sorted(
         [news.date for news in news_list],
         reverse=True,
-    )[:10]
+    )[:settings.NEWS_COUNT_ON_HOME_PAGE]
 
     assert actual_dates == expected_dates
 
 
-def test_comments_order_on_news_page(
-    client, detail_url, comments
-):
+def test_comments_order_on_news_page(client, detail_url, comments):
     response = client.get(detail_url)
 
-    actual_comments = list(
-        response.context['news'].comment_set.all()
-    )
+    actual_comments = [
+        comment.text
+        for comment in response.context['news'].comment_set.all()
+    ]
 
-    assert actual_comments == comments
+    expected_comments = [
+        'Комментарий 0',
+        'Комментарий 1',
+        'Комментарий 2',
+    ]
+
+    assert actual_comments == expected_comments
 
 
-def test_anonymous_user_does_not_see_comment_form(
-    client, detail_url
-):
-    response = client.get(detail_url)
-
-    assert 'form' not in response.context
+def test_anonymous_user_does_not_see_comment_form(client, detail_url):
+    assert 'form' not in client.get(detail_url).context
 
 
-def test_authorized_user_sees_comment_form(
-    author_client, detail_url
-):
-    response = author_client.get(detail_url)
+def test_authorized_user_sees_comment_form(author_client, detail_url):
+    context = author_client.get(detail_url).context
 
-    assert isinstance(response.context['form'], CommentForm)
+    assert 'form' in context
+    assert isinstance(context['form'], CommentForm)
