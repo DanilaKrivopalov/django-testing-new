@@ -18,6 +18,8 @@ def test_status_codes(
         (detail_url, client, HTTPStatus.OK),
         (login_url, client, HTTPStatus.OK),
         (signup_url, client, HTTPStatus.OK),
+        (edit_url, client, HTTPStatus.FOUND),
+        (delete_url, client, HTTPStatus.FOUND),
         (edit_url, author_client, HTTPStatus.OK),
         (delete_url, author_client, HTTPStatus.OK),
         (edit_url, reader_client, HTTPStatus.NOT_FOUND),
@@ -31,24 +33,23 @@ def test_status_codes(
 
 def test_redirects(
     client,
-    author_client,
     edit_url,
     delete_url,
-    login_url,
-    logout_url,
+    edit_redirect_url,
+    delete_redirect_url,
     subtests,
 ):
     redirect_cases = [
-        (edit_url, f'{login_url}?next={edit_url}'),
-        (delete_url, f'{login_url}?next={delete_url}'),
+        (edit_url, edit_redirect_url),
+        (delete_url, delete_redirect_url),
     ]
 
     for url, expected_url in redirect_cases:
         with subtests.test(url=url):
-            response = client.get(url)
+            assert client.get(url).url == expected_url
 
-            assert response.url == expected_url
 
+def test_logout(author_client, logout_url):
     author_client.post(logout_url)
 
     assert '_auth_user_id' not in author_client.session

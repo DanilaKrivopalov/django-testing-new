@@ -61,29 +61,33 @@ def comment(db, author, news):
 
 @pytest.fixture
 def news_list(db):
-    news_objects = [
+    News.objects.bulk_create(
         News(
             title=f'Новость {number}',
             text=f'Текст новости {number}.',
             date=timezone.localdate() + timedelta(days=number),
         )
         for number in range(11)
-    ]
-    return News.objects.bulk_create(news_objects)
+    )
 
 
 @pytest.fixture
 def comments(db, author, news):
-    current_time = timezone.now()
-    return Comment.objects.bulk_create([
+    comments = Comment.objects.bulk_create(
         Comment(
             news=news,
             author=author,
             text=f'Комментарий {number}',
-            created=current_time - timedelta(minutes=number),
         )
-        for number in range(3)
-    ])
+        for number in range(333)
+    )
+
+    current_time = timezone.now()
+
+    for number, comment in enumerate(comments):
+        comment.created = current_time - timedelta(minutes=number)
+
+    Comment.objects.bulk_update(comments, ['created'])
 
 
 @pytest.fixture
@@ -119,6 +123,16 @@ def login_url():
 @pytest.fixture
 def signup_url():
     return reverse('users:signup')
+
+
+@pytest.fixture
+def edit_redirect_url(login_url, edit_url):
+    return f'{login_url}?next={edit_url}'
+
+
+@pytest.fixture
+def delete_redirect_url(login_url, delete_url):
+    return f'{login_url}?next={delete_url}'
 
 
 @pytest.fixture
