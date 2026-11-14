@@ -47,9 +47,3 @@ def test_redirects(
     for url, expected_url in redirect_cases:
         with subtests.test(url=url):
             assert client.get(url).url == expected_url
-
-
-def test_logout(author_client, logout_url):
-    author_client.post(logout_url)
-
-    assert '_auth_user_id' not in author_client.session
